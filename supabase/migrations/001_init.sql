@@ -108,7 +108,7 @@ alter table mcp_event_subscriptions enable row level security;
 
 create or replace function search_whatsapp_messages(q text, p_since timestamptz default null, p_until timestamptz default null, p_limit int default 20)
 returns table(message_id uuid, conversation_id text, contact_phone text, contact_name text, direction text, body text, sent_at timestamptz, priority text, score int, category text)
-language sql stable security definer set search_path=public as $$
+language sql stable security invoker set search_path=public as $$
   select m.id, m.conversation_id, c.whatsapp_id, c.display_name, m.direction, m.body, m.sent_at, p.priority, p.score, p.category
   from messages m
   join conversations cv on cv.id=m.conversation_id
@@ -122,7 +122,7 @@ $$;
 
 create or replace function list_priority_messages(p_min_score int default 60, p_days int default 30, p_unresolved_only boolean default true, p_limit int default 50)
 returns table(message_id uuid, conversation_id text, contact_phone text, contact_name text, body text, sent_at timestamptz, score int, priority text, category text, opportunity boolean, action_required boolean, short_summary text, suggested_action text, deadline_at timestamptz)
-language sql stable security definer set search_path=public as $$
+language sql stable security invoker set search_path=public as $$
   select m.id, m.conversation_id, c.whatsapp_id, c.display_name, m.body, m.sent_at, p.score, p.priority, p.category, p.opportunity, p.action_required, p.short_summary, p.suggested_action, p.deadline_at
   from message_priority p join messages m on m.id=p.message_id join conversations cv on cv.id=m.conversation_id join contacts c on c.whatsapp_id=cv.contact_whatsapp_id
   where p.score >= p_min_score and m.sent_at >= now() - make_interval(days=>least(greatest(p_days,1),365)) and (not p_unresolved_only or cv.resolved_at is null)
@@ -131,7 +131,7 @@ $$;
 
 create or replace function list_unanswered_messages(p_older_than_hours int default 4, p_limit int default 30)
 returns table(conversation_id text, contact_phone text, contact_name text, inbound_message_id uuid, inbound_body text, inbound_at timestamptz, priority text, score int, suggested_action text)
-language sql stable security definer set search_path=public as $$
+language sql stable security invoker set search_path=public as $$
   with last_in as (
     select distinct on (conversation_id) id, conversation_id, body, sent_at from messages where direction='inbound' order by conversation_id, sent_at desc
   ), last_out as (
@@ -143,6 +143,13 @@ language sql stable security definer set search_path=public as $$
   where li.sent_at <= now() - make_interval(hours=>greatest(p_older_than_hours,0)) and (lo.sent_at is null or lo.sent_at < li.sent_at) and cv.resolved_at is null
   order by coalesce(p.score,0) desc, li.sent_at asc limit least(greatest(p_limit,1),50);
 $$;
+
+-- Explicit Data API privileges: this project is server-only.
+revoke all on all tables in schema public from anon, authenticated;
+revoke all on all sequences in schema public from anon, authenticated;
+grant usage on schema public to service_role;
+grant select, insert, update, delete on contacts, conversations, messages, message_priority, conversation_summaries, reply_drafts, audit_log, mcp_event_subscriptions to service_role;
+grant usage, select, update on sequence audit_log_id_seq to service_role;
 
 revoke all on function search_whatsapp_messages(text,timestamptz,timestamptz,int) from public, anon, authenticated;
 revoke all on function list_priority_messages(int,int,boolean,int) from public, anon, authenticated;
