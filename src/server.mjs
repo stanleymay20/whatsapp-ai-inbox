@@ -1,15 +1,35 @@
 import http from 'node:http';
+import crypto from 'node:crypto';
 import { config, assertCoreConfig } from './config.mjs';
 import { readBody, safeJsonParse, json, text, constantTimeEqual } from './util.mjs';
 import { handleMcp } from './mcp.mjs';
 import { processWebhook, verifyMetaSignature } from './whatsapp.mjs';
+import { oauthConsentHtml } from './oauth-ui.mjs';
 
 try { assertCoreConfig(); } catch (e) { console.warn(`CONFIG WARNING: ${e.message}`); }
+
+function oauthConsent(res) {
+  const nonce = crypto.randomBytes(18).toString('base64url');
+  const body = oauthConsentHtml(nonce);
+  const supabaseOrigin = config.supabaseUrl || 'https://invalid.example';
+  res.writeHead(200, {
+    'content-type':'text/html; charset=utf-8',
+    'content-length':Buffer.byteLength(body),
+    'cache-control':'no-store, max-age=0',
+    'x-content-type-options':'nosniff',
+    'x-frame-options':'DENY',
+    'referrer-policy':'no-referrer',
+    'permissions-policy':'camera=(), microphone=(), geolocation=(), payment=()',
+    'content-security-policy':`default-src 'none'; script-src https://cdn.jsdelivr.net 'nonce-${nonce}'; style-src 'unsafe-inline'; connect-src ${supabaseOrigin}; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,
+  });
+  res.end(body);
+}
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   try {
     if (req.method === 'GET' && url.pathname === '/health') return json(res, 200, { ok:true, service:'whatsapp-ai-inbox', version:'0.2.0', time:new Date().toISOString() });
+    if (req.method === 'GET' && url.pathname === '/oauth/consent') return oauthConsent(res);
     if (req.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
       return json(res, 200, { resource:config.publicBaseUrl, authorization_servers:config.oauthIssuer?[config.oauthIssuer]:[], scopes_supported:config.oauthScopes, resource_documentation:`${config.publicBaseUrl}/docs` });
     }
