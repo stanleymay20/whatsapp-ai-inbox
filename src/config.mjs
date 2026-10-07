@@ -14,6 +14,7 @@ export const config = {
   whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || '',
   metaAppSecret: process.env.META_APP_SECRET || '',
   supabaseUrl: (process.env.SUPABASE_URL || '').replace(/\/$/, ''),
+  supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || '',
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   openaiModel: process.env.OPENAI_MODEL || '',
