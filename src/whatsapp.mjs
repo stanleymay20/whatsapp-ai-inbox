@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { config } from './config.mjs';
 import { upsert, update, select, audit } from './db.mjs';
-import { classifyMessage } from './openai.mjs';
+import { classifyMessage, classifyMessageFallback } from './openai.mjs';
 import { emitEvent } from './events.mjs';
 import { constantTimeEqual } from './util.mjs';
 
@@ -33,6 +33,13 @@ function messageText(m) {
   return `[${m.type || 'Unsupported message'}]`;
 }
 
+async function storeClassification(row, cid, name, phone, classification) {
+  await upsert('message_priority', [{ message_id:row.id, ...classification, deadline_at:classification.deadline_iso || null }], 'message_id');
+  if (classification.score >= config.priorityEventMinScore) {
+    emitEvent('whatsapp.priority_detected', { message_id:row.id, conversation_id:cid, contact_name:name, sender_phone:phone, summary:classification.short_summary, priority:classification.priority, score:classification.score, category:classification.category, opportunity:classification.opportunity, action_required:classification.action_required, suggested_action:classification.suggested_action, deadline_iso:classification.deadline_iso }).catch(console.error);
+  }
+}
+
 async function storeInbound(value, m, source = 'cloud_api') {
   const phone = m.from;
   if (!phone || !m.id) return;
@@ -47,15 +54,21 @@ async function storeInbound(value, m, source = 'cloud_api') {
   if (!row) return;
   emitEvent('whatsapp.message_received', { message_id:row.id, conversation_id:cid, contact_name:name, sender_phone:phone, preview:body.slice(0,300) }).catch(console.error);
   let classification;
+  let classifier = 'openai';
   try {
     const recent = await select('messages', `select=direction,body,sent_at&conversation_id=eq.${cid}&order=sent_at.desc&limit=8`);
     classification = await classifyMessage({ sender:{ phone, name }, body, timestamp:ts, recentContext:(recent||[]).reverse() });
-    await upsert('message_priority', [{ message_id:row.id, ...classification, deadline_at:classification.deadline_iso || null }], 'message_id');
-    if (classification.score >= config.priorityEventMinScore) {
-      emitEvent('whatsapp.priority_detected', { message_id:row.id, conversation_id:cid, contact_name:name, sender_phone:phone, summary:classification.short_summary, priority:classification.priority, score:classification.score, category:classification.category, opportunity:classification.opportunity, action_required:classification.action_required, suggested_action:classification.suggested_action, deadline_iso:classification.deadline_iso }).catch(console.error);
-    }
-  } catch (e) { console.error('priority classification failed', e.message); }
-  await audit('whatsapp_message_received', { message_id:row.id, meta_message_id:m.id, classification }, 'meta-webhook');
+  } catch (e) {
+    classifier = 'deterministic_fallback';
+    classification = classifyMessageFallback({ body });
+    console.warn('priority classification fallback', e.message);
+  }
+  try {
+    await storeClassification(row, cid, name, phone, classification);
+  } catch (e) {
+    console.error('priority persistence failed', e.message);
+  }
+  await audit('whatsapp_message_received', { message_id:row.id, meta_message_id:m.id, classifier, classification }, 'meta-webhook');
 }
 
 async function storeStatus(s) {
