@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { constantTimeEqual, canonicalJson } from '../src/util.mjs';
+import { oauthConsentHtml } from '../src/oauth-ui.mjs';
 
 test('constantTimeEqual', () => {
   assert.equal(constantTimeEqual('abc','abc'), true);
@@ -17,4 +18,12 @@ test('Meta HMAC shape', () => {
   const secret='s'; const raw=Buffer.from('{"x":1}');
   const sig=`sha256=${crypto.createHmac('sha256',secret).update(raw).digest('hex')}`;
   assert.match(sig, /^sha256=[0-9a-f]{64}$/);
+});
+
+test('OAuth consent UI is nonce-protected and login-only', () => {
+  const html = oauthConsentHtml('testNonce_123');
+  assert.match(html, /<script nonce="testNonce_123">/);
+  assert.match(html, /Public sign-up is disabled/);
+  assert.doesNotMatch(html, /signUp\s*\(/);
+  assert.match(html, /signInWithPassword/);
 });
