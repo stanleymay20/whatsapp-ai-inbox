@@ -35,6 +35,16 @@ function verifyAudience(aud) {
   return Array.isArray(aud) ? aud.includes(config.oauthAudience) : aud === config.oauthAudience;
 }
 
+export function verifyJwtSignature({ alg, jwk, signingInput, signature }) {
+  const key = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+  const data = Buffer.from(signingInput);
+  if (alg === 'RS256') return crypto.verify('RSA-SHA256', data, key, signature);
+  if (alg === 'ES256') {
+    return crypto.verify('SHA256', data, { key, dsaEncoding: 'ieee-p1363' }, signature);
+  }
+  throw new Error('unsupported_jwt_alg');
+}
+
 export async function verifyBearer(header) {
   if (config.allowInsecureNoAuth) return { sub: 'insecure-dev', scopes: config.oauthScopes };
   const m = /^Bearer\s+(.+)$/i.exec(header || '');
@@ -47,12 +57,16 @@ export async function verifyBearer(header) {
   if (parts.length !== 3) return null;
   const headerObj = JSON.parse(b64urlDecode(parts[0]));
   const payload = JSON.parse(b64urlDecode(parts[1]));
-  if (headerObj.alg !== 'RS256' || !headerObj.kid) throw new Error('unsupported_jwt_alg');
+  if (!['RS256', 'ES256'].includes(headerObj.alg) || !headerObj.kid) throw new Error('unsupported_jwt_alg');
   const keys = await jwks();
   const jwk = keys.find(k => k.kid === headerObj.kid);
   if (!jwk) throw new Error('jwt_kid_not_found');
-  const key = crypto.createPublicKey({ key: jwk, format: 'jwk' });
-  const ok = crypto.verify('RSA-SHA256', Buffer.from(`${parts[0]}.${parts[1]}`), key, b64urlDecode(parts[2]));
+  const ok = verifyJwtSignature({
+    alg: headerObj.alg,
+    jwk,
+    signingInput: `${parts[0]}.${parts[1]}`,
+    signature: b64urlDecode(parts[2]),
+  });
   if (!ok) return null;
   const now = Math.floor(Date.now()/1000);
   if (payload.exp && payload.exp < now) return null;
