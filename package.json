@@ -8,6 +8,6 @@
     "start": "node src/server.mjs",
     "dev": "node --watch src/server.mjs",
     "test": "node --test",
-    "check": "node --check src/server.mjs && node --check src/mcp.mjs && node --check src/whatsapp.mjs && node --check src/openai.mjs && node --check src/db.mjs && node --check src/auth.mjs && node --check src/events.mjs"
+    "check": "node --check src/server.mjs && node --check src/mcp.mjs && node --check src/whatsapp.mjs && node --check src/openai.mjs && node --check src/db.mjs && node --check src/auth.mjs && node --check src/events.mjs && node --check src/oauth-ui.mjs"
   }
 }
