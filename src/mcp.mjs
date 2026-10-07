@@ -6,8 +6,8 @@ import { sendText } from './whatsapp.mjs';
 import { randomCode } from './util.mjs';
 import { EVENT_DEFS, subscribeEvent, unsubscribeEvent } from './events.mjs';
 
-const readSecurity = [{ type:'oauth2', scopes:['whatsapp.read'] }];
-const writeSecurity = [{ type:'oauth2', scopes:['whatsapp.write'] }];
+const readSecurity = [{ type:'oauth2', scopes:['email'] }];
+const writeSecurity = [{ type:'oauth2', scopes:['email'] }];
 
 const tools = [
   { name:'get_profile', title:'Get WhatsApp connection profile', description:'Use this to identify the connected WhatsApp Business account.', inputSchema:{type:'object',properties:{},additionalProperties:false}, annotations:{readOnlyHint:true,openWorldHint:false,destructiveHint:false}, securitySchemes:readSecurity },
@@ -122,7 +122,7 @@ export async function handleMcp(req, res, body) {
   if (method === 'notifications/initialized') { res.writeHead(204); return res.end(); }
   if (method === 'server/discover') return respond(res, id, { resultType:'complete', supportedVersions:['2026-07-28'], capabilities:{ tools:{}, events:{} } });
   if (method === 'tools/list') return respond(res, id, { tools });
-  const needed = method === 'tools/call' && ['create_reply_draft','approve_reply','send_approved_reply','reject_reply'].includes(body?.params?.name) ? ['whatsapp.write'] : ['whatsapp.read'];
+  const needed = ['email'];
   const identity = await requireIdentity(req, needed);
   if (!identity) {
     res.setHeader('www-authenticate', authChallenge(needed.join(' ')));
