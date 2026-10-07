@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { constantTimeEqual, canonicalJson } from '../src/util.mjs';
 import { oauthConsentHtml } from '../src/oauth-ui.mjs';
+import { verifyJwtSignature } from '../src/auth.mjs';
 
 test('constantTimeEqual', () => {
   assert.equal(constantTimeEqual('abc','abc'), true);
@@ -26,4 +27,13 @@ test('OAuth consent UI is nonce-protected and login-only', () => {
   assert.match(html, /Public sign-up is disabled/);
   assert.doesNotMatch(html, /signUp\s*\(/);
   assert.match(html, /signInWithPassword/);
+});
+
+test('ES256 JWT signatures verify with Supabase-style JWKs', () => {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', { namedCurve:'P-256' });
+  const jwk = publicKey.export({ format:'jwk' });
+  const signingInput = 'header.payload';
+  const signature = crypto.sign('SHA256', Buffer.from(signingInput), { key:privateKey, dsaEncoding:'ieee-p1363' });
+  assert.equal(verifyJwtSignature({ alg:'ES256', jwk, signingInput, signature }), true);
+  assert.equal(verifyJwtSignature({ alg:'ES256', jwk, signingInput:'header.tampered', signature }), false);
 });
