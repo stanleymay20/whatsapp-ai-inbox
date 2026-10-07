@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { constantTimeEqual, canonicalJson } from '../src/util.mjs';
 import { oauthConsentHtml } from '../src/oauth-ui.mjs';
 import { verifyJwtSignature } from '../src/auth.mjs';
+import { classifyMessageFallback } from '../src/openai.mjs';
 
 test('constantTimeEqual', () => {
   assert.equal(constantTimeEqual('abc','abc'), true);
@@ -36,4 +37,16 @@ test('ES256 JWT signatures verify with Supabase-style JWKs', () => {
   const signature = crypto.sign('SHA256', Buffer.from(signingInput), { key:privateKey, dsaEncoding:'ieee-p1363' });
   assert.equal(verifyJwtSignature({ alg:'ES256', jwk, signingInput, signature }), true);
   assert.equal(verifyJwtSignature({ alg:'ES256', jwk, signingInput:'header.tampered', signature }), false);
+});
+
+test('deterministic fallback elevates genuine opportunities', () => {
+  const interview = classifyMessageFallback({ body:'We reviewed your application and would like to invite you for an interview. Please confirm tomorrow.' });
+  assert.equal(interview.category, 'job');
+  assert.equal(interview.opportunity, true);
+  assert.equal(interview.action_required, true);
+  assert.ok(interview.score >= 75);
+
+  const routine = classifyMessageFallback({ body:'Hi, hope you are doing well.' });
+  assert.equal(routine.priority, 'low');
+  assert.equal(routine.opportunity, false);
 });
