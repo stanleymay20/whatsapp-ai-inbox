@@ -60,7 +60,10 @@ export async function verifyBearer(header) {
   if (config.oauthIssuer && payload.iss?.replace(/\/$/,'') !== config.oauthIssuer) return null;
   if (!verifyAudience(payload.aud)) return null;
   const scopes = String(payload.scope || '').split(/\s+/).filter(Boolean);
-  return { sub: payload.sub || 'oauth-user', scopes, payload };
+  const email = String(payload.email || '').trim().toLowerCase();
+  if (!config.oauthAllowedEmails.length) return null;
+  if (!email || !config.oauthAllowedEmails.includes(email)) return null;
+  return { sub: payload.sub || 'oauth-user', email, scopes, payload };
 }
 
 export function hasScopes(identity, needed) {
