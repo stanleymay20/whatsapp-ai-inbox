@@ -57,3 +57,54 @@ claiming live access. Do not enable the legacy Meta Business webhook for
 the owner's ordinary Messenger account.
 
 Reference: https://help.openai.com/en/articles/20001547-hosting-a-plugin-with-chatgpt-sites
+
+
+## New opt-in authenticated staging bridge (November 2)
+
+The archive branch now includes a **server-side import page and three read-only MCP tools**, in addition to the original offline parser. The new database schema is recorded at:
+`supabase/archive_schema.sql`
+
+- `GET /archive` loads the private owner sign-in and file upload screen.
+- `POST /archive/import` accepts an explicitly selected .txt export (<= 1.5 MB)
+  using a signed, owner-allowlisted Supabase bearer token.
+- `ENABLE_PERSONAL_ARCHIVE_IMPORT=false` by default.
+- Each import is atomically recorded with a SHA-256 deduplication key.
+- `list_archived_whatsapp_chats`, `search_archived_whatsapp`, and
+  `get_archived_whatsapp_chat` are read-only MCP tools.
+
+### Activation checklist (do not skip)
+
+1. Confirm the dedicated Supabase project is healthy and the RLS-only
+   `archive_imports`/`archive_messages` tables and four service-only RPCs exist.
+2. Set up an owner's Supabase Auth user using the private Dashboard (never
+   send the password or token through ChatGPT). Public sign-up should be disabled
+   if the project only serves one owner.
+3. Configure the Supabase OAuth 2.1 server and asymmetric signing key. Set the
+   Site URL to the staging Render origin; Auth > OAuth Server authorization path
+   `/oauth/consent`. Configure exact registered OAuth client redirects as required.
+4. In Render secret environment set `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PUBLISHABLE_KEY`,
+   `OAUTH_ISSUER`, `OAUTH_JWKS_URI`, `OAUTH_AUDIENCE=authenticated`,
+   `OAUTH_ALLOWED_EMAILS=<owner email>`.
+   Do not set any development bypass token.
+5. Set `ENABLE_PERSONAL_ARCHIVE_IMPORT=true` only once the above is correct.
+6. Open `https://whatsapp-ai-inbox-staging.onrender.com/archive`; authenticate,
+   then import ONE invented or non-sensitive example export. Confirm counts,
+   deduplication, owner-only search and original backup not touched.
+7. Connect a compatible ChatGPT MCP client using the secured
+   `https://whatsapp-ai-inbox-staging.onrender.com/mcp` endpoint. On Plus,
+   a ChatGPT Sites-hosted plugin may provide an alternative hosted path;
+   this still requires Site/plugin publication and user authorization.
+
+### Deployment and privacy limits
+
+The database stores plain message text protected by backend credentials and
+the provider's storage security, **not** client-side end-to-end encryption.
+Private content must not be imported without deliberate consent and a suitable
+retention/deletion strategy. There is no automatic message syncing, no reading
+of unexported chats, no merging of lost-iPhone and Android chat history, and no
+WhatsApp outbound sending from these archive tools.
+
+Docs:
+- https://supabase.com/docs/guides/auth/oauth-server/getting-started
+- https://help.openai.com/en/articles/20001547-hosting-a-plugin-with-chatgpt-sites
