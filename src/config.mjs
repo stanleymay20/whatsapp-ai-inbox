@@ -25,6 +25,7 @@ export const config = {
   oauthAllowedEmails: (process.env.OAUTH_ALLOWED_EMAILS || '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean),
   devBearerToken: process.env.DEV_BEARER_TOKEN || '',
   allowInsecureNoAuth: bool('ALLOW_INSECURE_NOAUTH', false),
+  enablePersonalArchiveImport: bool('ENABLE_PERSONAL_ARCHIVE_IMPORT', false),
   priorityEventMinScore: Number(process.env.PRIORITY_EVENT_MIN_SCORE || 75),
   maxSearchResults: Number(process.env.MAX_SEARCH_RESULTS || 50),
 };

@@ -1,10 +1,12 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { config, assertCoreConfig } from './config.mjs';
 import { readBody, safeJsonParse, json, text, constantTimeEqual } from './util.mjs';
 import { handleMcp } from './mcp.mjs';
 import { processWebhook, verifyMetaSignature } from './whatsapp.mjs';
 import { oauthConsentHtml } from './oauth-ui.mjs';
+import { handleArchiveImport } from './archive.mjs';
 
 try { assertCoreConfig(); } catch (e) { console.warn(`CONFIG WARNING: ${e.message}`); }
 
@@ -30,6 +32,37 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && url.pathname === '/health') return json(res, 200, { ok:true, service:'whatsapp-ai-inbox', version:'0.2.0', time:new Date().toISOString() });
     if (req.method === 'GET' && url.pathname === '/oauth/consent') return oauthConsent(res);
+    if (url.pathname === '/archive' && req.method === 'GET') {
+      if (!config.enablePersonalArchiveImport) return json(res, 503, { error:'archive_import_disabled' });
+      const body = await readFile(new URL('./archive-ui.html', import.meta.url));
+      const supabaseOrigin = config.supabaseUrl || 'https://invalid.example';
+      res.writeHead(200, {
+        'content-type':'text/html; charset=utf-8','cache-control':'no-store',
+        'x-content-type-options':'nosniff','x-frame-options':'DENY',
+        'referrer-policy':'no-referrer','permissions-policy':'camera=(), microphone=(), geolocation=(), payment=()',
+        'content-security-policy':`default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; connect-src 'self' ${supabaseOrigin}; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`
+      });
+      return res.end(body);
+    }
+    if (url.pathname === '/archive-ui.js' && req.method === 'GET') {
+      if (!config.enablePersonalArchiveImport) return json(res, 503, { error:'archive_import_disabled' });
+      const body = await readFile(new URL('./archive-ui.js', import.meta.url));
+      res.writeHead(200, { 'content-type':'application/javascript; charset=utf-8',
+        'cache-control':'no-store', 'x-content-type-options':'nosniff' });
+      return res.end(body);
+    }
+    if (url.pathname === '/archive/config' && req.method === 'GET') {
+      if (!config.enablePersonalArchiveImport) return json(res, 503, { error:'archive_import_disabled' });
+      return json(res, 200, { supabase_url:config.supabaseUrl,
+        supabase_publishable_key:config.supabasePublishableKey }, { 'cache-control':'no-store' });
+    }
+    if (url.pathname === '/archive/import' && req.method === 'POST') {
+      if (!String(req.headers['content-type'] || '').toLowerCase().startsWith('application/json')) {
+        return json(res, 415, { error:'json_required' });
+      }
+      const raw = await readBody(req, 2_000_000);
+      return handleArchiveImport(req, res, raw);
+    }
     if (req.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
       return json(res, 200, { resource:config.publicBaseUrl, authorization_servers:config.oauthIssuer?[config.oauthIssuer]:[], scopes_supported:config.oauthScopes, resource_documentation:`${config.publicBaseUrl}/docs` });
     }

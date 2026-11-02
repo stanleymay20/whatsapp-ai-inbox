@@ -3,3 +3,10 @@ node_modules/
 .env.*
 !.env.example
 .DS_Store
+
+# Never accidentally commit private WhatsApp exports or parsed archives.
+*.archive.json
+WhatsApp Chat*.txt
+WhatsApp Chat*.zip
+exports/
+private/
