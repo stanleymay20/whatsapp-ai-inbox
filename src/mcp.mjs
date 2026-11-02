@@ -181,10 +181,22 @@ export async function handleMcp(req, res, body, { archiveOnly = false } = {}) {
     return rpcError(res, id, -32601, 'Method is not available on the read-only archive endpoint.');
   }
   const needed = ['email'];
-  const identity = await requireIdentity(req, needed);
+  // Invalid or malformed bearer credentials must fail as unauthorized, not 500.
+  let identity = null;
+  try { identity = await requireIdentity(req, needed); } catch { identity = null; }
   if (!identity) {
-    res.setHeader('www-authenticate', authChallenge(needed.join(' ')));
-    return rpcError(res, id, -32001, 'Authentication required', { challenge:authChallenge(needed.join(' ')) }, 401);
+    const challenge = authChallenge(needed.join(' ')) + ', error="invalid_token", error_description="Sign in to access your private WhatsApp archive"';
+    res.setHeader('www-authenticate', challenge);
+    if (archiveOnly && method === 'tools/call') {
+      // ChatGPT requires a tool-level MCP authorization signal in addition
+      // to tool securitySchemes and protected-resource metadata.
+      return respond(res, id, {
+        content:[{ type:'text', text:'Authentication required. Connect your private WhatsApp archive account.' }],
+        isError:true,
+        _meta:{ 'mcp/www_authenticate':[challenge] }
+      }, 401);
+    }
+    return rpcError(res, id, -32001, 'Authentication required', { challenge }, 401);
   }
   try {
     if (method === 'tools/call') return respond(res, id, await callTool(body?.params?.name, body?.params?.arguments || {}, identity));
@@ -198,9 +210,9 @@ export async function handleMcp(req, res, body, { archiveOnly = false } = {}) {
   }
 }
 
-function respond(res, id, value) {
+function respond(res, id, value, status = 200) {
   const payload = JSON.stringify({ jsonrpc:'2.0', id, result:value });
-  res.writeHead(200, { 'content-type':'application/json; charset=utf-8', 'content-length':Buffer.byteLength(payload) });
+  res.writeHead(status, { 'content-type':'application/json; charset=utf-8', 'content-length':Buffer.byteLength(payload) });
   res.end(payload);
 }
 function rpcError(res, id, code, message, data, status=200) {
