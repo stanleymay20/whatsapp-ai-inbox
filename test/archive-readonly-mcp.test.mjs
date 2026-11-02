@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archiveToolAllowed, handleMcp } from '../src/mcp.mjs';
+import { config } from '../src/config.mjs';
 
 async function invoke(method, params, archiveOnly) {
   const response = {status:null, headers:null, body:null,
@@ -49,4 +50,14 @@ test('legacy MCP endpoint still lists existing Business tools', async() => {
   assert.ok(names.includes('get_profile'));
   assert.ok(names.includes('send_approved_reply'));
   assert.ok(names.includes('search_archived_whatsapp'));
+});
+
+test('archive-only MCP refuses development bearer token bypass configuration', async () => {
+  const prior = config.devBearerToken;
+  try {
+    config.devBearerToken = 'only-a-fabricated-test-value';
+    const r = await invoke('tools/list',{},true);
+    assert.equal(r.status,503);
+    assert.equal(r.parsed.error.code,-32002);
+  } finally { config.devBearerToken = prior; }
 });
