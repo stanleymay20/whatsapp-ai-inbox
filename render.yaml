@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: whatsapp-ai-inbox
+    runtime: node
+    plan: starter
+    buildCommand: npm run check && npm test
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
