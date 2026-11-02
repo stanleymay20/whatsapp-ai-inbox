@@ -53,6 +53,8 @@ export async function verifyBearer(header) {
   if (config.devBearerToken && constantTimeEqual(token, config.devBearerToken)) {
     return { sub: 'dev-token', scopes: config.oauthScopes };
   }
+  // Private inbox access requires a configured issuer, audience and owner allowlist.
+  if (!config.oauthIssuer || !config.oauthAudience || !config.oauthAllowedEmails.length) return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
   const headerObj = JSON.parse(b64urlDecode(parts[0]));
@@ -69,7 +71,9 @@ export async function verifyBearer(header) {
   });
   if (!ok) return null;
   const now = Math.floor(Date.now()/1000);
-  if (payload.exp && payload.exp < now) return null;
+  if (!Number.isInteger(payload.exp) || payload.exp <= now) return null;
+  if (typeof payload.sub !== 'string' || !payload.sub.trim()) return null;
+  if (payload.iat && payload.iat > now + 30) return null;
   if (payload.nbf && payload.nbf > now + 30) return null;
   if (config.oauthIssuer && payload.iss?.replace(/\/$/,'') !== config.oauthIssuer) return null;
   if (!verifyAudience(payload.aud)) return null;
@@ -77,7 +81,7 @@ export async function verifyBearer(header) {
   const email = String(payload.email || '').trim().toLowerCase();
   if (!config.oauthAllowedEmails.length) return null;
   if (!email || !config.oauthAllowedEmails.includes(email)) return null;
-  return { sub: payload.sub || 'oauth-user', email, scopes, payload };
+  return { sub: payload.sub, email, scopes, payload };
 }
 
 export function hasScopes(identity, needed) {
