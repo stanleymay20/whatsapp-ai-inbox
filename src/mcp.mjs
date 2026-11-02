@@ -10,6 +10,18 @@ const readSecurity = [{ type:'oauth2', scopes:['email'] }];
 const writeSecurity = [{ type:'oauth2', scopes:['email'] }];
 
 const tools = [
+  { name:'list_archived_whatsapp_chats', title:'List imported WhatsApp Messenger chats',
+    description:'List chats the owner explicitly exported and imported. These are archived snapshots, NOT live WhatsApp conversations.',
+    inputSchema:{type:'object',properties:{limit:{type:'integer',minimum:1,maximum:50}},additionalProperties:false},
+    annotations:{readOnlyHint:true,openWorldHint:false,destructiveHint:false}, securitySchemes:readSecurity },
+  { name:'search_archived_whatsapp', title:'Search archived WhatsApp Messenger messages',
+    description:'Search only owner-imported WhatsApp chat exports, not live Messenger. This tool cannot see new messages unless an updated export was imported.',
+    inputSchema:{type:'object',properties:{query:{type:'string',minLength:1,maxLength:120},limit:{type:'integer',minimum:1,maximum:50}},required:['query'],additionalProperties:false},
+    annotations:{readOnlyHint:true,openWorldHint:false,destructiveHint:false}, securitySchemes:readSecurity },
+  { name:'get_archived_whatsapp_chat', title:'Read imported WhatsApp Messenger chat',
+    description:'Read an explicitly imported WhatsApp chat snapshot. It does not contact WhatsApp or retrieve messages from a lost phone.',
+    inputSchema:{type:'object',properties:{import_id:{type:'string'},limit:{type:'integer',minimum:1,maximum:200},offset:{type:'integer',minimum:0,maximum:100000}},required:['import_id'],additionalProperties:false},
+    annotations:{readOnlyHint:true,openWorldHint:false,destructiveHint:false}, securitySchemes:readSecurity },
   { name:'get_profile', title:'Get WhatsApp connection profile', description:'Use this to identify the connected WhatsApp Business account.', inputSchema:{type:'object',properties:{},additionalProperties:false}, annotations:{readOnlyHint:true,openWorldHint:false,destructiveHint:false}, securitySchemes:readSecurity },
   { name:'search_whatsapp', title:'Search WhatsApp messages', description:'Use this when the user wants to find WhatsApp messages by words, people, topics, dates, opportunities, or prior discussions.', inputSchema:{type:'object',properties:{query:{type:'string'},since:{type:['string','null']},until:{type:['string','null']},limit:{type:'integer',minimum:1,maximum:50}},required:['query'],additionalProperties:false}, annotations:{readOnlyHint:true,openWorldHint:false,destructiveHint:false}, securitySchemes:readSecurity },
   { name:'list_priority_messages', title:'List important WhatsApp messages', description:'Use this when the user wants important, urgent, opportunity, deadline, or action-required WhatsApp messages.', inputSchema:{type:'object',properties:{min_score:{type:'integer',minimum:0,maximum:100},days:{type:'integer',minimum:1,maximum:365},unresolved_only:{type:'boolean'}},additionalProperties:false}, annotations:{readOnlyHint:true,openWorldHint:false,destructiveHint:false}, securitySchemes:readSecurity },
@@ -39,8 +51,37 @@ async function conversationRows(conversationId, limit=50) {
 
 async function callTool(name, args, identity) {
   switch (name) {
+    case 'list_archived_whatsapp_chats': {
+      const limit = Number.isInteger(args.limit) ? Math.min(Math.max(args.limit,1),50) : 20;
+      const chats = await rpc('list_archived_whatsapp_chats', { p_owner_sub:identity.sub, p_limit:limit });
+      return result({ chats:chats || [], mode:'imported_archive_only', is_live:false },
+        'Found '+(chats?.length || 0)+' imported WhatsApp chat archives (not live messages).');
+    }
+    case 'search_archived_whatsapp': {
+      if (typeof args.query !== 'string' || !args.query.trim() || args.query.length > 120) {
+        return err('Enter a search query of 1–120 characters.');
+      }
+      const limit = Number.isInteger(args.limit) ? Math.min(Math.max(args.limit,1),50) : 20;
+      const matches = await rpc('search_archived_whatsapp', {
+        p_owner_sub:identity.sub, p_query:args.query.trim(), p_limit:limit
+      });
+      return result({ matches:matches || [], is_live:false },
+        'Found '+(matches?.length || 0)+' matches in imported WhatsApp exports, not the live inbox.');
+    }
+    case 'get_archived_whatsapp_chat': {
+      if (typeof args.import_id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(args.import_id)) {
+        return err('Valid archive ID required.');
+      }
+      const rows = await rpc('get_archived_whatsapp_chat', {
+        p_owner_sub:identity.sub, p_import_id:args.import_id,
+        p_limit:Number.isInteger(args.limit) ? Math.min(Math.max(args.limit,1),200) : 100,
+        p_offset:Number.isInteger(args.offset) ? Math.min(Math.max(args.offset,0),100000) : 0
+      });
+      return result({ messages:rows || [], is_live:false },
+        'Loaded '+(rows?.length || 0)+' messages from a WhatsApp archive snapshot.');
+    }
     case 'get_profile':
-      return result({ business_phone:config.businessPhone, phone_number_id:config.phoneNumberId || null, mode:'WhatsApp Business Platform / Coexistence-ready' }, `Connected WhatsApp Business account: ${config.businessPhone || 'not configured'}.`);
+      return result({ business_phone:config.businessPhone, phone_number_id:config.phoneNumberId || null, mode:'Business API connector only; personal Messenger uses explicit archives, not live sync' }, `Connected WhatsApp Business account: ${config.businessPhone || 'not configured'}.`);
     case 'search_whatsapp': {
       const rows = await rpc('search_whatsapp_messages', { q:args.query, p_since:args.since || null, p_until:args.until || null, p_limit:Math.min(args.limit || 20, config.maxSearchResults) });
       return result({ results:rows }, `Found ${rows?.length || 0} matching WhatsApp messages.`);
