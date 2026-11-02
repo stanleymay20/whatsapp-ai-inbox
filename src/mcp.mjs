@@ -160,6 +160,11 @@ async function callTool(name, args, identity) {
 }
 
 export async function handleMcp(req, res, body, { archiveOnly = false } = {}) {
+  // The private personal archive can never use development authentication bypasses,
+  // even when the legacy Business MCP service still permits them for local testing.
+  if (archiveOnly && (config.allowInsecureNoAuth || config.devBearerToken)) {
+    return rpcError(res, body?.id ?? null, -32002, 'Archive MCP requires secure OAuth configuration.', undefined, 503);
+  }
   const method = body?.method;
   const id = body?.id ?? null;
   if (method === 'initialize') {
