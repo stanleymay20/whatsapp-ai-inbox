@@ -72,3 +72,75 @@ a migrated phone account. No archive import or extraction is implemented yet.
   https://support.apple.com/en-gb/122621
 - Apple account recovery:
   https://support.apple.com/en-us/102656
+
+
+## Android-specific immediate preservation procedure (2026-11-02)
+
+1. On the currently active Android WhatsApp Messenger, navigate to
+   Settings > Chats > Chat backup, and **observe** the Google Account,
+   last successful backup time, size, encryption status, and backup schedule.
+   Do not overwrite a potentially older Google backup before understanding it.
+2. Export indispensable individual and group chats from the Android app:
+   open chat > menu > More > Export chat > Include media. Store in a
+   private/encrypted archive outside the phone. Exported TXT/media files
+   cannot be imported as WhatsApp-restorable chat databases and may have
+   attachment limits.
+3. If feasible, **copy**, never move or delete, Android local WhatsApp
+   files via USB to a protected Windows drive: on many devices
+   `Internal storage/Android/media/com.whatsapp/WhatsApp/Databases`,
+   `.../Media`, and `.../Backups`. Local copies alone are not a
+   guaranteed or supported restore method.
+4. Once independently archived and confirmed there isn't a valuable
+   older Android Google backup to preserve, create a fresh official
+   WhatsApp backup on Google Account, with end-to-end encrypted backup.
+   Save the recovery password/passkey/key privately. Google overwrites
+   the previous WhatsApp backup for the same number/account.
+5. Confirm the Android backup timestamp updated and key chats/photos
+   remain visible in the app. Never reset or uninstall the working app
+   solely to test a backup.
+6. On Android browser, visit `https://account.apple.com/` or
+   `https://icloud.com/` to check Apple Account access. **iCloud.com
+   does not expose WhatsApp chats as a browseable chat archive or
+   conclusively verify the date of WhatsApp Chat Backup.** Verification
+   is generally inside WhatsApp on an iPhone (Settings > Chats >
+   Chat Backup), which can entail registering the phone number and
+   logging the active Android session out; do this only after step 1–5.
+7. If a compatible iCloud WhatsApp backup exists, recovering it may
+   require a spare/replacement iPhone, the same phone number, Apple
+   Account and encryption key/password if used. Restoring iPhone data
+   onto Android directly from iCloud is unsupported; WhatsApp's iPhone
+   -> Android transfer expects an operational iPhone with the restored
+   history and a new/reset Android device, and does **not** merge with
+   newer Android chats.
+8. Apple Lost Mode: `https://icloud.com/find` can be used even if the
+   trusted iPhone is missing, without a 2FA code; mark device lost.
+   Do not remove stolen iPhone from Find My while a theft/loss claim
+   remains pending. Remote erase is irreversible and should be
+   considered only with a separate security decision.
+
+## Do-not-run list
+
+- No WhatsApp Business migration or Meta Coexistence enrollment on the
+  owner's personal Messenger phone number.
+- No Android factory reset, WhatsApp uninstall, app-data clear,
+  re-registration on a second iPhone, or iCloud backup deletion
+  without verified independent protection of existing Android chats.
+- No new cloud backups over unexamined older snapshots.
+- No untrusted third-party iCloud WhatsApp extraction or chat merging
+  software, and no exposure of chat exports, OTPs, passwords, backup
+  keys or tokens to public repos or ChatGPT chat logs.
+
+## Source references
+
+- WhatsApp Android backup:
+  https://faq.whatsapp.com/481135090640375
+- WhatsApp Android export:
+  https://faq.whatsapp.com/1180414079177245
+- WhatsApp iCloud recovery:
+  https://faq.whatsapp.com/618575946635920
+- WhatsApp iPhone -> Android cannot merge:
+  https://faq.whatsapp.com/1066696467238362
+- Google Android transfer:
+  https://support.google.com/android/answer/14669513
+- Apple lost-device protection:
+  https://support.apple.com/en-us/101593
