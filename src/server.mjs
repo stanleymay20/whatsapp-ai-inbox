@@ -82,6 +82,12 @@ const server = http.createServer(async (req, res) => {
       processWebhook(payload).catch(e => console.error('Webhook processing failed', e));
       return;
     }
+    if (url.pathname === '/mcp/archive' && req.method === 'POST') {
+      const raw = await readBody(req, 1_000_000);
+      return handleMcp(req, res, safeJsonParse(raw), { archiveOnly:true });
+    }
+    if (url.pathname === '/mcp/archive' && req.method === 'GET')
+      return json(res, 405, { error:'Use POST for the read-only archive MCP endpoint.' });
     if (url.pathname === '/mcp' && req.method === 'POST') {
       const raw = await readBody(req, 1_000_000);
       return handleMcp(req, res, safeJsonParse(raw));
