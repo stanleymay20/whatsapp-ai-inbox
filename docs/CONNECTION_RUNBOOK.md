@@ -40,9 +40,13 @@ Also distinguish two different goals:
    of the user's WhatsApp conversations.
 2. **Searching private WhatsApp conversations from ChatGPT**: this repository
    targets Meta's WhatsApp Business API and an authenticated custom MCP server.
-   As of November 2, 2026, OpenAI's documented full custom MCP plugin support
-   is for eligible Business and Enterprise/Edu workspaces (and Pro supports
-   read/fetch-only custom MCP); Plus access should **not** be assumed.
+   As of November 2, 2026, direct custom MCP connections are documented
+   for eligible Business / Enterprise / Edu workspaces and read/fetch-only
+   configurations for Pro. For Plus, the **ChatGPT Sites-hosted MCP plugin**
+   is a separately documented path that may make the integration accessible
+   without upgrading. It must still be built, published, and authorized:
+   https://help.openai.com/en/articles/20001547-hosting-a-plugin-with-chatgpt-sites
+   https://help.openai.com/en/articles/20001339-creating-and-using-chatgpt-sites
 
 Sources:
 - https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt
