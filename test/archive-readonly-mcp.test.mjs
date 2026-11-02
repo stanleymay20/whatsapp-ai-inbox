@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { archiveToolAllowed, handleMcp } from '../src/mcp.mjs';
 import { config } from '../src/config.mjs';
 
-async function invoke(method, params, archiveOnly) {
-  const response = {status:null, headers:null, body:null,
-    setHeader() {},
-    writeHead(status,headers) {this.status=status; this.headers=headers;},
+async function invoke(method, params, archiveOnly, requestHeaders = {}) {
+  const response = {status:null, headers:{}, body:null,
+    setHeader(key,value) {this.headers[key.toLowerCase()]=value;},
+    writeHead(status,headers) {this.status=status;Object.assign(this.headers,headers);},
     end(s) {this.body=s;}
   };
-  await handleMcp({headers:{}}, response, {jsonrpc:'2.0', id:1, method, params}, {archiveOnly});
+  await handleMcp({headers:requestHeaders}, response, {jsonrpc:'2.0', id:1, method, params}, {archiveOnly});
   return { ...response, parsed:response.body?JSON.parse(response.body):null };
 }
 
@@ -41,7 +41,22 @@ test('archive endpoint needs authorization before reading archive data',async ()
   assert.equal(archiveToolAllowed('search_archived_whatsapp'),true);
   const r=await invoke('tools/call',{name:'search_archived_whatsapp',arguments:{query:'test'}},true);
   assert.equal(r.status,401);
-  assert.equal(r.parsed.error.code,-32001);
+  assert.equal(r.parsed.result.isError,true);
+  const challenges=r.parsed.result._meta?.['mcp/www_authenticate'];
+  assert.ok(Array.isArray(challenges) && challenges.length===1);
+  assert.match(challenges[0],/resource_metadata=/);
+  assert.match(challenges[0],/error="invalid_token"/);
+  assert.match(challenges[0],/error_description=/);
+  assert.equal(r.headers['www-authenticate'],challenges[0]);
+});
+
+test('tampered malformed JWT fails closed and triggers the same safe OAuth challenge',async () => {
+  const r=await invoke('tools/call',
+    {name:'search_archived_whatsapp',arguments:{query:'synthetic'}},true,
+    { authorization:'Bearer aaa.bbb.ccc' });
+  assert.equal(r.status,401);
+  assert.equal(r.parsed.result.isError,true);
+  assert.ok(r.parsed.result._meta?.['mcp/www_authenticate']?.length);
 });
 
 test('legacy MCP endpoint still lists existing Business tools', async() => {
